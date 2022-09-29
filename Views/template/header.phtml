@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A FindMyFriends type of Web Application">
+    <meta name="author" content="Steven Duckett">
+    <link rel="icon" href="Media/Tab-Icon.png" />
+
+    <!--Bootstrap link below this line, along with my own custom CSS styling file -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="CSS/my-style.css" rel="stylesheet">
+    <title>FriendBook</title>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="index.php">FriendBook</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            </ul>
+            <div class="spacerDiv"></div>
+
+            <!-- "Controls" for the Live Search Feature Below -->
+            <div class="col-md-6">
+                <form method="post" class="d-flex" action="/search.php">
+                    <div class="input-group">
+                        <input id="searchBox" class="form-control input-group-lg" name="userSearchTerm" type="text" placeholder="Start typing here to search" aria-label="Search">
+                    </div>
+                </form>
+            </div>
+            <!-- "Controls" for the Live Search Feature Above -->
+
+            <div id="spacerDiv"></div>
+            <?php
+            //The below is needed because the header is the first thing required into a model
+            //and the $view is declared after it, so it cannot read/"see" it so $view->[variableNameHere] cannot be used
+            require_once('Models/UserDataSet.php');
+            $userDataSet = new UserDataSet();
+            $allUsersFriends = $userDataSet->retrieveAllFriendRequests($_SESSION['uid']);
+            $friendRequestNotificationCount = 0;
+            foreach($allUsersFriends as $friend){
+                if($friend->getFriend1ID() != $_SESSION['uid']){
+                    $friendRequestNotificationCount = $friendRequestNotificationCount + 1;
+                }
+            }
+            echo '<div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">Options</button>
+                       <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">';
+            echo '<form method="post" action="index.php"><button class="btn btn-outline-secondary" type="submit">Home</button></form>';
+            echo '<form method="post" action="landingPageUser.php"><button class="btn btn-outline-secondary" type="submit">Friends</button></form>';
+            if(sizeof($allUsersFriends) > 0){
+                echo '<form method="post" action="friendRequests.php"><button class="btn btn-outline-secondary" type="submit">Friend Requests (' . $friendRequestNotificationCount . ')</button></form>';
+            }
+            else{
+                echo '<form method="post" action="friendRequests.php"><button class="btn btn-outline-secondary" type="submit">Friend Requests</button></form>';
+            }
+            echo '<form method="post" action="landingPageGeneral.php"><button class="btn btn-outline-secondary" type="submit">All Users</button></form>';
+            echo '<form method="post" action="blockedUsers.php"><button class="btn btn-outline-secondary" type="submit">Blocked Users</button></form>';
+
+            echo '<form method="post" action="profilePage.php"><button class="btn btn-outline-secondary" type="submit">Profile</button></form>';
+            echo '<form method="post" action="landingPageUser.php"><button class="btn btn-outline-secondary" type="submit" name="logOut">Log Out</button></form>';
+
+            echo '</ul>
+                </div>';
+            ?>
+            <input type="hidden" value="" id="currentRequests">
+            <script src="JS/Classes/AjaxClass.js"></script>
+            <script src="JS/Classes/LiveSearch.js"></script>
+            <script src="JS/Classes/InputValidation.js"></script>
+            <script>
+                <?php
+                    //Make a super secret token for this session
+                    $searchToken = substr(str_shuffle(MD5(microtime())), 0, 20);
+                    //Assign new token as token for SESSION
+                    $_SESSION["ajaxSearchToken"] = $searchToken;
+                    //echo 'console.log("Search token is' . $searchToken . '");'; //Debugging
+                    echo 'var searchToken = "' . $searchToken . '";';
+                ?>
+                var ajaxClass = new AjaxClass();
+                var liveSearch = new LiveSearch(null);
+                var inputValidator = new InputValidation();
+                document.getElementById('searchBox').addEventListener("keyup", function(){
+                    //Where the results will be output
+                    var uic = document.getElementById("results");
+                    liveSearch.showSearchResults(document.getElementById('searchBox').value, searchToken, function(returnParam){
+                        uic.innerHTML = returnParam;
+                    });
+                }, false);
+
+            </script>
+        </div>
+    </div>
+</nav>
+<!-- User profile modal -->
+<div class="modal fade" id="personModal" tabindex="-1" aria-labelledby="personModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <table  class="table table-hover">
+                    <thead><td>Category</td><td>Value</td></thead>
+                    <tbody id='modalTable'>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Distance calculator modal -->
+<div class="modal fade" id="distanceModal" tabindex="-1" aria-labelledby="distanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="distanceModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <table class="container-fluid">
+                    <thead>
+                        <tr><td>Me</td><td colspan="3">Distance</td><td>Friend</td></tr>
+                    </thead>
+                    <tbody id='distanceTable'>
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    <?php
+    //Make a new session token - used for security
+    $modalToken= substr(str_shuffle(MD5(microtime())), 0, 20);
+    $_SESSION["modalToken"] = $modalToken;
+    ?>
+    var personModal = document.getElementById('personModal');
+    personModal.addEventListener('show.bs.modal', function (event) {
+        //Get the userID from the value assigned to the data-bs-userID attribute/button
+        let userID = event.relatedTarget.getAttribute('data-bs-userID');
+
+        //Select the areas in the modal to be updated
+        let modalTitle = personModal.querySelector('.modal-title')
+        let modalTable = personModal.querySelector('#modalTable')
+
+        //Uses an ajax call from external class to load the required data for the modal
+        liveSearch.loadModalData(userID, <?php echo "\"$modalToken\"";?>, function(returnParam){
+            //Update the selected content in the modal
+            modalTitle.textContent = returnParam['personName'];
+            modalTable.innerHTML = returnParam['modalString'];
+        })
+    })
+
+    var distanceModal = document.getElementById('distanceModal');
+    distanceModal.addEventListener('show.bs.modal', function (event) {
+        //Get the userID from the value assigned to the data-bs-userID attribute/button
+        let friendID = event.relatedTarget.getAttribute('data-bs-userID');
+
+        //Select the areas in the modal to be updated
+        let modalTitle = distanceModal.querySelector('.modal-title')
+        let distanceCalcOutput = distanceModal.querySelector('#distanceTable')
+
+        //Uses an ajax call from external class to load the required data for the modal
+        myMap.distanceCalculator(friendID, <?php echo '"' . $_SESSION['uid'] . '"';?>, <?php echo "\"$modalToken\"";?>, function(returnParam){
+            //Update the selected content in the modal
+            distanceCalcOutput.innerHTML = returnParam;
+        })
+    })
+</script>
+<!-- Results for the Live Search Feature Below -->
+<div class="col-md-6" id="resultsDiv">
+    <ul class="list-group" id="results"></ul>
+</div>
+<!-- Results for the Live Search Feature Above -->
+<div id="content" class="container-l">

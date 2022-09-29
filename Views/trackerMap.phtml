@@ -1,0 +1,83 @@
+<?php require('template/header.phtml'); ?>
+
+    <!-- This table is to display the users current Friends -->
+    <div class="usersTable">
+        <div id="Map"></div>
+        <script src="OpenLayers-2.13.1/OpenLayers.js"></script>
+        <script src="JS/Classes/MyMap.js"></script>
+        <script>
+            //Global Variables
+            var markerLayer = new OpenLayers.Layer.Vector("Markers");
+            var globalUserMarker;
+
+            //THE CODE BELOW THIS COMMENT IS FULLY WORKING DO NOT DELETE - 13/3/2022
+            var map = new OpenLayers.Map("Map");
+            var myMap = new MyMap(map);
+            map = myMap.makeMyMap();
+
+            <?php
+            //Make a new session token - used for security
+            $plottingToken = substr(str_shuffle(MD5(microtime())), 0, 20);
+            $_SESSION["ajaxPlotUserToken"] = $plottingToken;
+            ?>
+            myMap.plotMarkers(markerLayer, <?php echo '"' . $view->loggedInUserID . '"';?>, <?php echo "\"$plottingToken\"";?>,function(returnParam){
+                markerLayer = returnParam;
+                map.addLayer(markerLayer);
+            });
+
+            function success(position){
+                let indexOfLast = markerLayer.features.length-1;
+                let i=0;
+                let lat = position.coords.latitude;
+                let long = position.coords.longitude;
+                markerLayer.features.forEach(function(returnVal){
+                    if(i === indexOfLast){
+                        markerLayer.removeFeatures(returnVal);
+                        returnVal = myMap.makeMyMapMarker(<?php echo '"' . $view->loggedInUser->getUserID() . '"' ?>, <?php echo '"' . $view->loggedInUser->getUsername() . '"' ?>, <?php echo '"' . $view->loggedInUser->getFirstName() . '"' ?>, <?php echo '"' . $view->loggedInUser->getLastname() . '"' ?>, long, lat, <?php echo '"' . $view->loggedInUser->getProfileImage() . '"' ?>);
+                        markerLayer.addFeatures(returnVal);
+                    }else{
+                        i++;
+                    }
+                });
+                <?php
+                //Make a new session token - used for security
+                $tempToken = substr(str_shuffle(MD5(microtime())), 0, 20);
+                $trackingToken = strval($tempToken);
+                $_SESSION["ajaxTrackingToken"] = $trackingToken;
+                ?>
+                myMap.storeNewCoords(<?php echo '"' . $view->loggedInUser->getLatitude() . '"';?>,<?php echo '"' . $view->loggedInUser->getLongitude() . '"';?>, long, lat, <?php echo '"' . $view->loggedInUserID . '"';?>, <?php echo "\"$trackingToken\"";?>);
+            }
+
+            //Watches for changes in the browsers geolocation and fires off an event each time it changes
+            if(!navigator.geolocation){
+                //If geolocation not supported by browser, then show error message
+                var event = new CustomEvent("gpsEvent", {"details" : "Geolocation isn't supported by your browser!"});
+                document.dispatchEvent(event);
+            }else{
+                //Else, call the watch position function below
+                navigator.geolocation.watchPosition(success, myMap.locationError);
+            }
+            document.addEventListener("gpsEvent", success);
+
+            var popUpControls = {
+                selector: new OpenLayers.Control.SelectFeature(markerLayer, {
+                    onSelect: createPopup,
+                    onUnselect: destroyPopup,
+                })
+            };
+
+            function createPopup(feature){
+                map.addPopup(myMap.createMarkerPopUp(feature));
+            }
+
+            function destroyPopup(feature){
+                feature.popup.destroy();
+                feature.popup = null;
+            }
+
+            map.addControl(popUpControls['selector']);
+            popUpControls['selector'].activate();
+        </script>
+    </div>
+
+<?php require('template/footer.phtml'); ?>
